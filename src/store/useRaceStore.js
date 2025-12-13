@@ -36,46 +36,103 @@ const useRaceStore = create(
       retrievers: [],
 
       // Actions
-      setGroupId: (id) => set({ groupId: id }),
+      setGroupId: (id) => {
+        set({ groupId: id });
+        // Trigger subscription if ID is set
+        get().subscribeToGroup(id);
+      },
 
-      leaveGroup: () => set({ groupId: null }), // Reset group ID to trigger WelcomeModal
+      unsubscribe: null, // Store cleanup function
 
-      addPilot: (pilotData) => set((state) => {
-        const currentGroupPilots = state.pilots.filter(p => p.groupId === state.groupId);
-        // Find max ID in current group. Assumes IDs are numeric strings "1", "2", etc.
+      subscribeToGroup: async (groupId) => {
+        const state = get();
+        if (state.unsubscribe) {
+          state.unsubscribe(); // Cleanup previous listener
+        }
+
+        if (!groupId) return;
+
+        const { listenToGroupData } = await import('../services/raceService');
+
+        const cleanup = listenToGroupData(groupId, (type, data) => {
+          if (type === 'pilots') set({ pilots: data });
+          if (type === 'retrievers') set({ retrievers: data });
+        });
+
+        set({ unsubscribe: cleanup });
+      },
+
+      leaveGroup: () => {
+        const state = get();
+        if (state.unsubscribe) state.unsubscribe();
+        set({ groupId: null, unsubscribe: null, pilots: [], retrievers: [] });
+      },
+
+      addPilot: async (pilotData) => {
+        // Calculate State First (Optimistic or wait for DB? For now, let's calculate ID locally or let User decide? 
+        // Current logic uses local Auto-ID.
+        // We will call the cloud first, if success, update local.
+        const state = get();
+        const groupId = state.groupId;
+
+        // Calculate new ID
+        const currentGroupPilots = state.pilots.filter(p => p.groupId === groupId);
         const maxId = currentGroupPilots.reduce((max, p) => Math.max(max, parseInt(p.id) || 0), 0);
         const newId = (maxId + 1).toString();
 
         const newPilot = {
           ...pilotData,
-          groupId: state.groupId,
+          groupId: groupId,
           id: newId,
           status: 'befFly',
-          lastStatusUpdate: new Date().toISOString()
+          // wtsc will be set by server, but for local UI immediate feedback:
+          wtsc: Date.now()
         };
 
-        return { pilots: [...state.pilots, newPilot] };
-      }),
+        // Update Local immediately (Optimistic UI)
+        set((state) => ({ pilots: [...state.pilots, newPilot] }));
 
-      updatePilotStatus: (id, status) => set((state) => ({
-        pilots: state.pilots.map((p) =>
-          (p.id === id && p.groupId === state.groupId) ? { ...p, status, lastStatusUpdate: new Date().toISOString() } : p
-        )
-      })),
+        // Push to Cloud
+        // Dynamic import to avoid cycles or simple import at top
+        const { addPilotToCloud } = await import('../services/raceService');
+        addPilotToCloud(groupId, newPilot);
+      },
 
-      addRetriever: (retrieverData) => set((state) => {
-        const currentGroupRetrievers = state.retrievers.filter(r => r.groupId === state.groupId);
+      updatePilotStatus: async (id, status) => {
+        const state = get();
+        const groupId = state.groupId;
+
+        // Optimistic Local Update
+        set((state) => ({
+          pilots: state.pilots.map((p) =>
+            (p.id === id && p.groupId === groupId) ? { ...p, status, wtsc: Date.now() } : p
+          )
+        }));
+
+        // Cloud Update
+        const { updatePilotStatusInCloud } = await import('../services/raceService');
+        updatePilotStatusInCloud(groupId, id, status);
+      },
+
+      addRetriever: async (retrieverData) => {
+        const state = get();
+        const groupId = state.groupId;
+
+        const currentGroupRetrievers = state.retrievers.filter(r => r.groupId === groupId);
         const maxId = currentGroupRetrievers.reduce((max, r) => Math.max(max, parseInt(r.id) || 0), 0);
         const newId = (maxId + 1).toString();
 
         const newRetriever = {
           ...retrieverData,
-          groupId: state.groupId,
+          groupId: groupId,
           id: newId,
         };
 
-        return { retrievers: [...state.retrievers, newRetriever] };
-      }),
+        set((state) => ({ retrievers: [...state.retrievers, newRetriever] }));
+
+        const { addRetrieverToCloud } = await import('../services/raceService');
+        addRetrieverToCloud(groupId, newRetriever);
+      },
 
       updateRetrieverTaskCount: (id, count) => set((state) => ({
         retrievers: state.retrievers.map((r) =>
