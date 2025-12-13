@@ -1,5 +1,27 @@
+# 1. Bağımlılıklar (Kesinlikle yüklenmemeli)
 node_modules/
-.env
+
+# 2. Build Çıktıları (Production için oluşturulan dosyalar)
 dist/
 build/
+
+# 3. Çevresel Değişkenler ve Güvenlik (ÇOK ÖNEMLİ)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 4. Editör ve İşletim Sistemi Dosyaları (Gereksiz kirlilik)
+.vscode/
+.idea/
 .DS_Store
+Thumbs.db
+
+# 5. Log Dosyaları
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 6. Test kapsamı (Varsa)
+coverage/

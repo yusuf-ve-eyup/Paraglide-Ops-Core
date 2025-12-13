@@ -7,7 +7,7 @@ const LandedPilotsList = () => {
 
     const landedPilots = pilots
         .filter((p) => p.status === 'landed')
-        .sort((a, b) => new Date(a.lastStatusUpdate).getTime() - new Date(b.lastStatusUpdate).getTime());
+        .sort((a, b) => new Date(a.wtsc).getTime() - new Date(b.wtsc).getTime());
 
     const getTimeSince = (dateString) => {
         const diff = Date.now() - new Date(dateString).getTime();
@@ -30,7 +30,7 @@ const LandedPilotsList = () => {
                         </div>
                         <div className="flex items-center text-red-600 font-bold text-sm">
                             <Clock size={14} className="mr-1" />
-                            {getTimeSince(pilot.lastStatusUpdate)}
+                            {getTimeSince(pilot.wtsc)}
                         </div>
                     </div>
                 ))}

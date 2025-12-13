@@ -9,7 +9,7 @@ const TimeoutList = () => {
 
     const timeoutPilots = pilots.filter((p) => {
         if (p.status !== 'waiting') return false;
-        const timeDiff = Date.now() - new Date(p.lastStatusUpdate).getTime();
+        const timeDiff = Date.now() - new Date(p.wtsc).getTime();
         return timeDiff > timeoutThreshold;
     });
 
@@ -33,7 +33,7 @@ const TimeoutList = () => {
                     <div key={pilot.id} className="bg-white p-2 rounded shadow-sm text-sm border border-orange-300 mb-2 flex justify-between items-center">
                         <div>
                             <span className="font-bold text-red-700">{pilot.nameSurname}</span>
-                            <p className="text-xs text-gray-500">Waiting for: {getWaitTime(pilot.lastStatusUpdate)}</p>
+                            <p className="text-xs text-gray-500">Waiting for: {getWaitTime(pilot.wtsc)}</p>
                         </div>
                         <button className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700 transition">
                             Escalate
