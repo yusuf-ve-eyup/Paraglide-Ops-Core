@@ -141,6 +141,22 @@ const useRaceStore = create(
         )
       })),
 
+      updatePilotRetriever: async (pilotId, retrieverId) => {
+        const state = get();
+        const groupId = state.groupId;
+
+        // Optimistic Update
+        set((state) => ({
+          pilots: state.pilots.map((p) =>
+            (p.id === pilotId && p.groupId === groupId) ? { ...p, retrieverId } : p
+          )
+        }));
+
+        // Cloud Update
+        const { updatePilotRetrieverInCloud } = await import('../services/raceService');
+        updatePilotRetrieverInCloud(groupId, pilotId, retrieverId);
+      },
+
       // Helper to get next ID for UI display (optional use)
       getNextPilotId: () => {
         const state = get();

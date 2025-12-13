@@ -124,3 +124,19 @@ export const addRetrieverToCloud = async (groupId, retrieverData) => {
         return { success: false, error };
     }
 };
+
+// Update Pilot's Retriever
+export const updatePilotRetrieverInCloud = async (groupId, pilotId, retrieverId) => {
+    try {
+        const updates = {};
+        updates[`groups/${groupId}/pilots/${pilotId}/retrieverId`] = retrieverId;
+        // Optional: Update timestamp if needed, but maybe not for just assignment? 
+        // Let's keep wtsc as "last STATUS change". If assignment isn't a status change, maybe don't touch wtsc.
+
+        await update(ref(db), updates);
+        return { success: true };
+    } catch (error) {
+        console.error("Update Retriever Error:", error);
+        return { success: false, error };
+    }
+};

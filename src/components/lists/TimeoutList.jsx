@@ -35,9 +35,7 @@ const TimeoutList = () => {
                             <span className="font-bold text-red-700">{pilot.nameSurname}</span>
                             <p className="text-xs text-gray-500">Waiting for: {getWaitTime(pilot.wtsc)}</p>
                         </div>
-                        <button className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700 transition">
-                            Escalate
-                        </button>
+
                     </div>
                 ))}
                 {timeoutPilots.length === 0 && <p className="text-gray-400 text-xs text-center py-2">No timeouts.</p>}
