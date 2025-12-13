@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useRaceStore from '../store/useRaceStore';
 import SidebarLeft from '../components/dashboard/SidebarLeft';
 import BottomPanel from '../components/dashboard/BottomPanel';
 import MapWidget from '../components/dashboard/MapWidget';
@@ -10,6 +11,16 @@ import { PlusCircle, Truck, Settings } from 'lucide-react';
 const Dashboard = () => {
     const navigate = useNavigate();
     const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
+
+    // Store Connection
+    const { groupId, subscribeToGroup } = useRaceStore();
+
+    // Re-connect to Real-time DB on reload/mount if logged in
+    useEffect(() => {
+        if (groupId) {
+            subscribeToGroup(groupId);
+        }
+    }, [groupId]); // Re-run if groupId changes (e.g. login/logout)
 
     return (
         <div className="h-screen w-screen grid grid-cols-12 grid-rows-6 overflow-hidden relative">

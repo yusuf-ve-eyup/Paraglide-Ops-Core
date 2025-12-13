@@ -67,7 +67,7 @@ const RetrieverManagementPage = () => {
                             <Truck size={32} />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-800">Add Rescue Vehicle</h1>
+                            <h1 className="text-2xl font-bold text-gray-800">Add Retrieve Vehicle</h1>
                             <p className="text-gray-500 text-sm">Register new retrieval vehicle</p>
                         </div>
                     </div>

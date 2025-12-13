@@ -14,6 +14,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
  * @property {number} locationX - Latitude
  * @property {number} locationY - Longitude
  * @property {PilotStatus} status
+ * @property {number} retrieverId - ID of assigned rescue vehicle (0 if none)
  * @property {string} lastStatusUpdate - ISO String
  */
 

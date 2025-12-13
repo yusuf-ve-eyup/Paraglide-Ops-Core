@@ -83,6 +83,7 @@ export const addPilotToCloud = async (groupId, pilotData) => {
         const pilotRef = ref(db, `groups/${groupId}/pilots/${pilotData.id}`);
         const data = {
             ...pilotData,
+            retrieverId: pilotData.retrieverId || 0, // Ensure it exists
             wtsc: serverTimestamp()
         };
         await set(pilotRef, data);
