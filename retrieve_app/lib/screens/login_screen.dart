@@ -30,8 +30,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // Query Firebase Realtime Database
-      // Structure: retrievers/$groupId/$userId
-      final dbRef = FirebaseDatabase.instance.ref('retrievers/$groupId/$userId');
+      // New Structure: 
+      // {
+      //   "groups": {
+      //      "23": {
+      //         "pilots": { ... },
+      //         "retrievers": [ ... ]
+      //      }
+      //   }
+      // }
+      // Path: groups/$groupId/retrievers/$userId
+
+      final dbRef = FirebaseDatabase.instance.ref('groups/$groupId/retrievers/$userId');
       final snapshot = await dbRef.get();
 
       if (snapshot.exists) {
