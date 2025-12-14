@@ -38,13 +38,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final retrieverSnapshot = await retrieverRef.get();
 
       if (retrieverSnapshot.exists) {
-        // Is Retriever
         await prefs.setBool('isLoggedIn', true);
         await prefs.setString('userId', userId);
         await prefs.setString('groupId', groupId);
         await prefs.setString('userType', 'retriever');
         
-        // Save Name if available
         final data = retrieverSnapshot.value as Map?;
         if (data != null && data['nameSurname'] != null) {
              await prefs.setString('nameSurname', data['nameSurname']);
@@ -58,18 +56,16 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // 2. Check Pilot (if not retriever)
+      // 2. Check Pilot
       final pilotRef = db.ref('groups/$groupId/pilots/$userId');
       final pilotSnapshot = await pilotRef.get();
 
       if (pilotSnapshot.exists) {
-        // Is Pilot
         await prefs.setBool('isLoggedIn', true);
         await prefs.setString('userId', userId);
         await prefs.setString('groupId', groupId);
         await prefs.setString('userType', 'pilot');
         
-         // Save Name if available
         final data = pilotSnapshot.value as Map?;
         if (data != null && data['nameSurname'] != null) {
              await prefs.setString('nameSurname', data['nameSurname']);
@@ -112,43 +108,94 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TextField(
-                  controller: _groupIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'Group ID',
-                    border: OutlineInputBorder(),
-                  ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Gradient Header
+            Container(
+              height: 250,
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.indigo, Colors.blueAccent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _userIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'User ID',
-                    border: OutlineInputBorder(),
-                  ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(40),
+                  bottomRight: Radius.circular(40),
                 ),
-                const SizedBox(height: 24),
-                _isLoading
-                    ? const CircularProgressIndicator()
-                    : SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _login,
-                          child: const Text('Submit'),
+              ),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.paragliding, size: 80, color: Colors.white),
+                  SizedBox(height: 16),
+                  Text(
+                    "Retriever Ops",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 40),
+
+            // Floating Login Card
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Card(
+                elevation: 8,
+                shadowColor: Colors.black26,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    children: [
+                      const Text(
+                        "Welcome Back",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
-              ],
+                      const SizedBox(height: 24),
+                      TextField(
+                        controller: _groupIdController,
+                        decoration: const InputDecoration(
+                          labelText: 'Group ID',
+                          prefixIcon: Icon(Icons.group),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _userIdController,
+                        decoration: const InputDecoration(
+                          labelText: 'User ID',
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text("LOGIN"),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

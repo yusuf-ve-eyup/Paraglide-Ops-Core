@@ -50,7 +50,6 @@ class _PilotScreenState extends State<PilotScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Permissions
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         throw 'Location services are disabled. Please enable GPS.';
@@ -68,12 +67,10 @@ class _PilotScreenState extends State<PilotScreen> {
         throw 'Location permissions are permanently denied.';
       }
 
-      // 2. Get Position
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      // 3. Update Firebase
       final ref = FirebaseDatabase.instance
           .ref('groups/$_groupId/pilots/$_userId');
 
@@ -127,7 +124,6 @@ class _PilotScreenState extends State<PilotScreen> {
           ),
         ],
       ),
-      // Wrap the entire body in StreamBuilder to handle global state/status
       body: StreamBuilder<DatabaseEvent>(
         stream: FirebaseDatabase.instance
             .ref('groups/$_groupId/pilots/$_userId')
@@ -146,108 +142,118 @@ class _PilotScreenState extends State<PilotScreen> {
           final String status = pilotData['status']?.toString() ?? 'unknown';
           final String? retrieverId = pilotData['retrieverId']?.toString();
           
-          // --- LOGIC IMPLEMENTATION ---
-          
-          // 1. "I Landed" Button Logic
-          // Active ONLY if status is 'flying'
           final bool canSendLocation = (status == 'flying');
 
-          // 2. "Call Retriever" Button Logic
-          // Active ONLY if retrieverId is not null AND status is 'waiting'
           final bool canCallRetriever = (retrieverId != null && 
                                          retrieverId.isNotEmpty && 
                                          status == 'waiting');
 
           return Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 1. "I Landed" Action
-                SizedBox(
-                  width: double.infinity,
-                  height: 60,
-                  child: ElevatedButton.icon(
-                    // If loading, disable. If not flying, disable (null).
-                    onPressed: (_isLoading || !canSendLocation) 
-                        ? null 
-                        : _sendLocation,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.location_on),
-                    label: Text(
-                      _isLoading ? 'Sending...' : 'I Landed - Send Location',
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      disabledForegroundColor: Colors.grey.shade600,
-                    ),
+                // STATUS CARD
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: canSendLocation ? Colors.blue.shade50 : Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.info_outline,
+                          color: canSendLocation ? Colors.blue : Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("CURRENT STATUS", style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
+                          Text(
+                            status.toUpperCase(),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
                 
-                // Optional: Status Indicator Text
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    "Current Status: $status",
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontStyle: FontStyle.italic,
+                const Spacer(),
+
+                // MASSIVE LANDED BUTTON
+                GestureDetector(
+                  onTap: (_isLoading || !canSendLocation) ? null : _sendLocation,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    height: 200,
+                    decoration: BoxDecoration(
+                      gradient: canSendLocation 
+                          ? const LinearGradient(colors: [Colors.indigo, Colors.blueAccent], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                          : LinearGradient(colors: [Colors.grey.shade300, Colors.grey.shade400]),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: canSendLocation 
+                          ? [BoxShadow(color: Colors.blueAccent.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 10))]
+                          : [],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_isLoading)
+                           const CircularProgressIndicator(color: Colors.white)
+                        else ...[
+                           Icon(Icons.location_on_outlined, size: 60, color: canSendLocation ? Colors.white : Colors.grey.shade600),
+                           const SizedBox(height: 16),
+                           Text(
+                             "I LANDED",
+                             style: TextStyle(
+                               fontSize: 32,
+                               fontWeight: FontWeight.w900,
+                               color: canSendLocation ? Colors.white : Colors.grey.shade600,
+                               letterSpacing: 1.5,
+                             ),
+                           ),
+                           Text(
+                             "Tap to Send Location",
+                             style: TextStyle(
+                               fontSize: 16,
+                               color: canSendLocation ? Colors.white70 : Colors.grey.shade600,
+                             ),
+                           ),
+                        ]
+                      ],
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 30),
-                const Divider(),
-                const SizedBox(height: 10),
+                const Spacer(),
 
-                // 2. Retriever Info Section
-                const Text(
-                  "Assigned Retriever Status",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-
-                Expanded(
-                  child: Builder(
-                    builder: (context) {
-                      if (retrieverId == null || retrieverId.isEmpty) {
-                        return const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.hourglass_empty,
-                                  size: 50, color: Colors.grey),
-                              SizedBox(height: 10),
-                              Text(
-                                "Waiting for a retriever to be assigned...",
-                                style: TextStyle(
-                                    fontSize: 16, color: Colors.grey),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      // Retriever is assigned, show card
-                      return _RetrieverInfoCard(
-                        groupId: _groupId!,
-                        retrieverId: retrieverId,
-                        canCall: canCallRetriever,
-                      );
-                    },
+                // RETRIEVER INFO
+                if (retrieverId == null || retrieverId.isEmpty)
+                  Center(
+                    child: Text(
+                      "Waiting for assignment...",
+                      style: TextStyle(fontSize: 16, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                    ),
+                  )
+                else
+                  _RetrieverInfoCard(
+                    groupId: _groupId!,
+                    retrieverId: retrieverId,
+                    canCall: canCallRetriever,
                   ),
-                ),
+                
+                const SizedBox(height: 20),
               ],
             ),
           );
@@ -269,33 +275,19 @@ class _RetrieverInfoCard extends StatelessWidget {
   });
 
   Future<void> _callRetriever(String phoneNumber) async {
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
-    );
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
     if (await canLaunchUrl(launchUri)) {
       await launchUrl(launchUri);
-    } else {
-      debugPrint("Could not launch $launchUri");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<DataSnapshot>(
-      future: FirebaseDatabase.instance
-          .ref('groups/$groupId/retrievers/$retrieverId')
-          .get(),
+      future: FirebaseDatabase.instance.ref('groups/$groupId/retrievers/$retrieverId').get(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return const Center(child: Text("Error loading retriever info"));
-        }
-
         if (!snapshot.hasData || snapshot.data?.value == null) {
-          return const Center(child: Text("Retriever info not found."));
+          return const SizedBox.shrink();
         }
 
         final data = Map<dynamic, dynamic>.from(snapshot.data!.value as Map);
@@ -304,45 +296,39 @@ class _RetrieverInfoCard extends StatelessWidget {
 
         return Card(
           elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Row(
               children: [
-                const Icon(Icons.person_pin_circle,
-                    size: 60, color: Colors.green),
-                const SizedBox(height: 10),
-                const Text(
-                  "Your Retriever:",
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.green.shade50,
+                  child: const Icon(Icons.person, color: Colors.green, size: 30),
                 ),
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "ASSIGNED RETRIEVER",
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        name,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: (canCall && phone != null)
-                        ? () => _callRetriever(phone)
-                        : null,
-                    icon: const Icon(Icons.phone),
-                    label: const Text("Call Retriever"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      disabledForegroundColor: Colors.grey.shade600,
-                    ),
-                  ),
+                IconButton.filled(
+                  onPressed: (canCall && phone != null) ? () => _callRetriever(phone) : null,
+                  style: IconButton.styleFrom(backgroundColor: canCall ? Colors.green : Colors.grey.shade300),
+                  icon: const Icon(Icons.phone),
+                  iconSize: 24,
                 ),
               ],
             ),

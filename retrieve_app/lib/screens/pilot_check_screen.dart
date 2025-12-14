@@ -44,30 +44,23 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
     String pilotName,
     bool isChecked,
   ) async {
-    // Unfocus any active element (like the search bar) before showing dialog or changing status
-    // to prevent keyboard from popping up unexpectedly.
     FocusManager.instance.primaryFocus?.unfocus();
 
-    // If currently checked (active), new status is 'befFly' (inactive).
-    // If currently unchecked (inactive), new status is 'flying' (active).
     final newStatus = isChecked ? 'befFly' : 'flying';
     final action = isChecked ? 'uncheck' : 'check';
 
-    // Show Confirmation Dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Confirm Status Change'),
-          content: Text(
-            'Are you sure you want to $action $pilotName?',
-          ),
+          title: Text('Confirm $action'),
+          content: Text('Are you sure you want to set $pilotName to ${isChecked ? "Inactive" : "Active"}?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('Cancel'),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Confirm'),
             ),
@@ -76,14 +69,10 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
       },
     );
 
-    // Ensure focus is cleared after dialog closes
-    if (mounted) {
-      FocusScope.of(context).unfocus();
-    }
+    if (mounted) FocusScope.of(context).unfocus();
 
     if (confirmed != true || _groupId == null) return;
 
-    // Updated Path: groups/$groupId/pilots/$pilotId
     final dbRef = FirebaseDatabase.instance.ref('groups/$_groupId/pilots/$pilotId');
 
     if (newStatus == 'flying') {
@@ -108,15 +97,10 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
       return;
     }
 
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
-    );
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
     try {
       if (await canLaunchUrl(launchUri)) {
         await launchUrl(launchUri);
-      } else {
-        throw 'Could not launch $launchUri';
       }
     } catch (e) {
       if (mounted) {
@@ -128,7 +112,6 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
   }
 
   void _showDetailDialog(Map<dynamic, dynamic> pilot, String pilotId) {
-    // Unfocus search bar if open
     FocusScope.of(context).unfocus();
 
     final name = pilot['nameSurname'] ?? 'Unknown';
@@ -138,14 +121,24 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(name),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: Colors.indigo,
+                child: Icon(Icons.person, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold))),
+            ],
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('ID: $pilotId'),
-              const SizedBox(height: 8),
-              Text('Phone: $phone'),
+              _buildInfoRow(Icons.badge, "Pilot ID", pilotId),
+              const SizedBox(height: 12),
+              _buildInfoRow(Icons.phone, "Phone", phone.toString().isNotEmpty ? phone : "N/A"),
             ],
           ),
           actions: [
@@ -153,21 +146,40 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Close'),
             ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _makePhoneCall(phone.toString());
-              },
-              icon: const Icon(Icons.call),
-              label: const Text('Call'),
-            ),
+            if (phone.toString().isNotEmpty)
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _makePhoneCall(phone.toString());
+                },
+                icon: const Icon(Icons.call),
+                label: const Text('Call Pilot'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                ),
+              ),
           ],
         );
       },
     ).then((_) {
-       // Ensure focus is cleared after dialog closes
        if(mounted) FocusScope.of(context).unfocus();
     });
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+          ],
+        )
+      ],
+    );
   }
 
   @override
@@ -178,32 +190,42 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
       );
     }
 
-    // Updated Path: groups/$groupId/pilots
     final pilotsRef = FirebaseDatabase.instance.ref('groups/$_groupId/pilots');
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Takeoff Checklist'),
+        elevation: 0,
       ),
-      // Detect taps outside input fields to dismiss keyboard
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
-            // Search Bar
-            Padding(
-              padding: const EdgeInsets.all(12.0),
+            // Search Bar Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              decoration: const BoxDecoration(
+                color: Colors.indigo,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
+                ),
+              ),
               child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
-                autofocus: false,
+                style: const TextStyle(color: Colors.black87),
                 decoration: InputDecoration(
-                  hintText: 'Search by Name',
-                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Search Pilot Name...',
+                  hintStyle: TextStyle(color: Colors.grey.shade500),
+                  prefixIcon: const Icon(Icons.search, color: Colors.indigo),
+                  fillColor: Colors.white,
+                  filled: true,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 ),
                 onChanged: (value) {
                   setState(() {
@@ -212,6 +234,7 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
                 },
               ),
             ),
+            
             // Pilot List
             Expanded(
               child: StreamBuilder<DatabaseEvent>(
@@ -220,44 +243,41 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
                   if (snapshot.hasError) {
                     return Center(child: Text('Error: ${snapshot.error}'));
                   }
-
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-
-                  if (!snapshot.hasData ||
-                      snapshot.data!.snapshot.value == null) {
-                    return const Center(child: Text('No pilots found.'));
+                  if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.flight_takeoff, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text('No pilots found.', style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    );
                   }
 
                   final rawData = snapshot.data!.snapshot.value;
                   final List<MapEntry<dynamic, dynamic>> pilotsList = [];
 
-                  // Handle both Map and List (array) structures from Firebase
                   if (rawData is Map) {
                     pilotsList.addAll(rawData.entries);
                   } else if (rawData is List) {
                     for (int i = 0; i < rawData.length; i++) {
                       if (rawData[i] != null) {
-                        // Use the index as the key, effectively converting List to Map entries
                         pilotsList.add(MapEntry(i.toString(), rawData[i]));
                       }
                     }
-                  } else {
-                     return const Center(child: Text('Unexpected data format'));
                   }
 
-                  // Filter
                   final filteredPilots = pilotsList.where((entry) {
                     final pilot = entry.value as Map<dynamic, dynamic>;
-                    final name =
-                        (pilot['nameSurname'] ?? '').toString().toLowerCase();
-                    
-                    // Filter strictly by Name per new requirements
+                    final name = (pilot['nameSurname'] ?? '').toString().toLowerCase();
                     return name.contains(_searchQuery);
                   }).toList();
 
-                  // Sort Alphabetically
                   filteredPilots.sort((a, b) {
                     final nameA = (a.value['nameSurname'] ?? '').toString();
                     final nameB = (b.value['nameSurname'] ?? '').toString();
@@ -265,55 +285,85 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
                   });
 
                   if (filteredPilots.isEmpty) {
-                    return const Center(child: Text('No matching pilots.'));
+                    return const Center(child: Text('No matching pilots found.'));
                   }
 
-                  return ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
                     itemCount: filteredPilots.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final entry = filteredPilots[index];
                       final pilotId = entry.key;
                       final pilotData = entry.value as Map<dynamic, dynamic>;
-
                       final name = pilotData['nameSurname'] ?? 'Unknown';
                       final status = pilotData['status'];
                       
-                      // LOGIC UPDATE: Checkbox is checked if status is NOT 'befFly'
                       final isChecked = status != 'befFly';
 
-                      return InkWell(
-                        onTap: () => _showDetailDialog(pilotData, pilotId),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 16.0, horizontal: 8.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // Left Side: Name
-                              Expanded(
-                                child: Text(
-                                  name,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                      return Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: isChecked ? Colors.green.withOpacity(0.5) : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: InkWell(
+                          onTap: () => _showDetailDialog(pilotData, pilotId),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: isChecked ? Colors.green.shade100 : Colors.indigo.shade50,
+                                  child: Icon(
+                                    isChecked ? Icons.check : Icons.person_outline,
+                                    color: isChecked ? Colors.green : Colors.indigo,
                                   ),
                                 ),
-                              ),
-                              // Right Side: Checkbox
-                              Transform.scale(
-                                scale: 1.5,
-                                child: Checkbox(
-                                  value: isChecked,
-                                  onChanged: (bool? value) {
-                                    if (value != null) {
-                                      _changeStatus(pilotId, name, isChecked);
-                                    }
-                                  },
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name,
+                                        style: const TextStyle(
+                                          fontSize: 16, 
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        isChecked ? "Status: Active" : "Status: Inactive",
+                                        style: TextStyle(
+                                          fontSize: 12, 
+                                          color: isChecked ? Colors.green : Colors.grey,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                                Transform.scale(
+                                  scale: 1.2,
+                                  child: Checkbox(
+                                    value: isChecked,
+                                    activeColor: Colors.green,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    onChanged: (bool? value) {
+                                      if (value != null) {
+                                        _changeStatus(pilotId, name, isChecked);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );

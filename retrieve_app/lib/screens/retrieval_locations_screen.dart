@@ -9,9 +9,6 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// Note: We use the existing LocationService configuration from lib/services/location_service.dart
-// effectively by interacting with the singleton FlutterBackgroundService.
-
 class RetrievalLocationsScreen extends StatefulWidget {
   const RetrievalLocationsScreen({super.key});
 
@@ -58,14 +55,12 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
   }
 
   Future<void> _checkPermissionsAndStart() async {
-    // 1. Check Service Enabled
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) _showSnackBar('Lütfen cihazınızın GPS özelliğini açın.');
       return;
     }
 
-    // 2. Check Permission
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -80,7 +75,6 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
       return;
     }
 
-    // 3. Enforce "Always Allow" for Background Service
     if (permission == LocationPermission.whileInUse) {
       if (mounted) {
         await showDialog(
@@ -106,10 +100,9 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
           ),
         );
       }
-      return; // Do not proceed
+      return; 
     }
 
-    // 4. Start Service if Permitted
     if (permission == LocationPermission.always) {
       _startBackgroundService();
       _getCurrentLocation();
@@ -133,13 +126,11 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
   Future<void> _startBackgroundService() async {
     final service = FlutterBackgroundService();
     
-    // Listen for UI updates from service (sent via 'update' or 'error')
     service.on('update').listen((event) {
       if (event != null && mounted) {
         final lat = event['lat'] as double?;
         final lng = event['lng'] as double?;
         if (lat != null && lng != null) {
-          // Update state if significant change or first time
           if (_currentLocation == null || 
               _distanceCalculator.as(LengthUnit.Meter, _currentLocation!, LatLng(lat, lng)) > 5) {
             setState(() {
@@ -150,8 +141,6 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
       }
     });
 
-    // We assume the service is already configured in main.dart -> LocationService.initialize()
-    // So we just check if running, and start if not.
     if (!await service.isRunning()) {
       service.startService();
     }
@@ -161,14 +150,12 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  // Helper: Process Data from Firebase
   List<Map<String, dynamic>> _processPilots(DataSnapshot snapshot) {
     final rawData = snapshot.value;
     if (rawData == null) return [];
 
     List<Map<String, dynamic>> pilots = [];
     
-    // Handle both List and Map structures from Firebase
     if (rawData is Map) {
       rawData.forEach((key, value) {
         if (value is Map) {
@@ -187,12 +174,10 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
       }
     }
 
-    // Filter: Assigned to me AND Status is waiting
     pilots = pilots.where((p) {
       return p['retrieverId'].toString() == _userId && p['status'] == 'waiting';
     }).toList();
 
-    // Sort: Distance Ascending
     if (_currentLocation != null) {
       pilots.sort((a, b) {
         final latA = (a['locationX'] as num?)?.toDouble() ?? 0;
@@ -214,23 +199,21 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
     bool? confirm = await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Onay'),
-        content: Text('$name alındı olarak işaretlensin mi?'),
+        title: const Text('Confirm Retrieval'),
+        content: Text('Mark $name as retrieved?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Onayla')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
         ],
       ),
     );
 
     if (confirm == true && _groupId != null) {
-      // Mark as taked
       await FirebaseDatabase.instance.ref('groups/$_groupId/pilots/$pilotId').update({
         'status': 'taked',
         'wtsc': ServerValue.timestamp,
       });
 
-      // NEW: Update Retriever taskCount
       final retrieverRef = FirebaseDatabase.instance.ref('groups/$_groupId/retrievers/$_userId');
       await retrieverRef.update({
         'taskCount': ServerValue.increment(-1),
@@ -243,8 +226,8 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
      try {
        await launchUrl(uri, mode: LaunchMode.externalApplication);
      } catch(e) {
-       debugPrint("Harita hatası: $e");
-       if(mounted) _showSnackBar("Harita açılamadı.");
+       debugPrint("Map error: $e");
+       if(mounted) _showSnackBar("Could not open map.");
      }
   }
 
@@ -268,7 +251,7 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
               stream: _pilotsStream,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(child: Text('Veri hatası: ${snapshot.error}'));
+                  return Center(child: Text('Data Error: ${snapshot.error}'));
                 }
                 
                 List<Map<String, dynamic>> pilots = [];
@@ -278,82 +261,112 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
 
                 return Column(
                   children: [
-                    // MAP SECTION
-                    SizedBox(
+                    // Styled Map Container
+                    Container(
                       height: MediaQuery.of(context).size.height * 0.35,
-                      child: FlutterMap(
-                        mapController: _mapController,
-                        options: MapOptions(
-                          initialCenter: _currentLocation ?? const LatLng(39.93, 32.85),
-                          initialZoom: 13,
-                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.example.retrieve_app',
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          )
+                        ],
+                        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                      ),
+                      child: ClipRect( // Ensures markers don't overflow visibly if clipped
+                        child: FlutterMap(
+                          mapController: _mapController,
+                          options: MapOptions(
+                            initialCenter: _currentLocation ?? const LatLng(39.93, 32.85),
+                            initialZoom: 13,
+                            interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
                           ),
-                          // My Location
-                          if (_currentLocation != null)
-                            MarkerLayer(
-                              markers: [
-                                Marker(
-                                  point: _currentLocation!,
-                                  width: 40,
-                                  height: 40,
-                                  child: const Icon(Icons.navigation, color: Colors.blue, size: 30),
-                                ),
-                              ],
+                          children: [
+                            TileLayer(
+                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.example.retrieve_app',
                             ),
-                          // Pilots
-                          MarkerLayer(
-                            markers: pilots.asMap().entries.map((entry) {
-                              final index = entry.key + 1;
-                              final p = entry.value;
-                              final lat = (p['locationX'] as num?)?.toDouble() ?? 0;
-                              final lng = (p['locationY'] as num?)?.toDouble() ?? 0;
-                              
-                              return Marker(
-                                point: LatLng(lat, lng),
-                                width: 40,
-                                height: 40,
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    const Icon(Icons.location_on, color: Colors.red, size: 40),
-                                    Positioned(
-                                      top: 5,
-                                      child: Text(
-                                        "$index",
-                                        style: const TextStyle(
-                                          color: Colors.white, 
-                                          fontSize: 12, 
-                                          fontWeight: FontWeight.bold
+                            if (_currentLocation != null)
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: _currentLocation!,
+                                    width: 50,
+                                    height: 50,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(color: Colors.black26, blurRadius: 4),
+                                        ]
+                                      ),
+                                      child: const Icon(Icons.navigation, color: Colors.indigo, size: 30),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            MarkerLayer(
+                              markers: pilots.asMap().entries.map((entry) {
+                                final index = entry.key + 1;
+                                final p = entry.value;
+                                final lat = (p['locationX'] as num?)?.toDouble() ?? 0;
+                                final lng = (p['locationY'] as num?)?.toDouble() ?? 0;
+                                
+                                return Marker(
+                                  point: LatLng(lat, lng),
+                                  width: 45,
+                                  height: 45,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      const Icon(Icons.location_on, color: Colors.deepOrange, size: 45),
+                                      Positioned(
+                                        top: 8,
+                                        child: Text(
+                                          "$index",
+                                          style: const TextStyle(
+                                            color: Colors.white, 
+                                            fontSize: 14, 
+                                            fontWeight: FontWeight.bold
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ],
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const Divider(height: 1),
                     
-                    // PILOT LIST
+                    // Task List
                     Expanded(
                       child: pilots.isEmpty
-                          ? const Center(child: Text('Aktif görev bulunamadı.'))
-                          : ListView.separated(
-                              padding: const EdgeInsets.all(8),
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.task_alt, size: 64, color: Colors.grey.shade400),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No active tasks assigned.',
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder( // Changed to builder for Cards
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               itemCount: pilots.length,
-                              separatorBuilder: (c, i) => const SizedBox(height: 8),
                               itemBuilder: (context, index) {
                                 final p = pilots[index];
                                 final pilotId = p['key'];
-                                final name = p['nameSurname'] ?? 'İsimsiz Pilot';
+                                final name = p['nameSurname'] ?? 'Unknown Pilot';
                                 final phone = p['phoneNumber'];
                                 final lat = (p['locationX'] as num?)?.toDouble() ?? 0;
                                 final lng = (p['locationY'] as num?)?.toDouble() ?? 0;
@@ -367,69 +380,115 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
                                 }
 
                                 return Card(
-                                  elevation: 2,
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
-                                      child: Text(
-                                        "${index + 1}", 
-                                        style: const TextStyle(fontWeight: FontWeight.bold)
-                                      ),
-                                    ),
-                                    title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                  elevation: 3,
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Column(
                                       children: [
-                                        Text(distText.isNotEmpty ? "Mesafe: $distText" : "Konum bekleniyor..."),
+                                        Row(
+                                          children: [
+                                            // Index Circle
+                                            Container(
+                                              width: 40,
+                                              height: 40,
+                                              alignment: Alignment.center,
+                                              decoration: const BoxDecoration(
+                                                color: Colors.indigo,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Text(
+                                                "${index + 1}",
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 18,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            // Pilot Info
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    name,
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 18,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.near_me, size: 16, color: Colors.grey[600]),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        distText.isNotEmpty ? distText : "Locating...",
+                                                        style: TextStyle(color: Colors.grey[700]),
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      const Text(
+                                                        "• Waiting",
+                                                        style: TextStyle(
+                                                          color: Colors.green, 
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 12
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            // Checkbox
+                                            Transform.scale(
+                                              scale: 1.3,
+                                              child: Checkbox(
+                                                value: false, 
+                                                activeColor: Colors.green,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                                onChanged: (val) {
+                                                  if (val == true) {
+                                                    _markAsRetrieved(pilotId, name);
+                                                  }
+                                                },
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 16),
+                                        const Divider(),
                                         const SizedBox(height: 8),
+                                        // Action Buttons
                                         Row(
                                           children: [
                                             Expanded(
                                               child: OutlinedButton.icon(
                                                 onPressed: () => _launchPhone(phone?.toString()),
-                                                icon: const Icon(Icons.phone, size: 18),
-                                                label: const Text(
-                                                  "Ara", 
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
+                                                icon: const Icon(Icons.phone, size: 20),
+                                                label: const Text("Call Pilot"),
                                                 style: OutlinedButton.styleFrom(
-                                                  visualDensity: VisualDensity.compact,
                                                   foregroundColor: Colors.green,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                  side: const BorderSide(color: Colors.green),
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 8),
+                                            const SizedBox(width: 12),
                                             Expanded(
-                                              child: OutlinedButton.icon(
+                                              child: ElevatedButton.icon(
                                                 onPressed: () => _launchMap(lat, lng),
-                                                icon: const Icon(Icons.map, size: 18),
-                                                label: const Text(
-                                                  "Harita",
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                                 style: OutlinedButton.styleFrom(
-                                                  visualDensity: VisualDensity.compact,
-                                                  foregroundColor: Colors.blue,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                icon: const Icon(Icons.map, size: 20),
+                                                label: const Text("Navigate"),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.indigo,
                                                 ),
                                               ),
                                             ),
                                           ],
                                         )
                                       ],
-                                    ),
-                                    trailing: Transform.scale(
-                                      scale: 1.2,
-                                      child: Checkbox(
-                                        value: false, // Always false until checked, then it disappears from list
-                                        onChanged: (val) {
-                                          if (val == true) {
-                                            _markAsRetrieved(pilotId, name);
-                                          }
-                                        },
-                                      ),
                                     ),
                                   ),
                                 );
