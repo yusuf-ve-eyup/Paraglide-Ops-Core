@@ -18,8 +18,7 @@ const RetrieverManagementPage = () => {
         addRetriever({
             nameSurname: formData.nameSurname,
             phoneNumber: formData.phoneNumber,
-            locationX: 36.5 + (Math.random() * 0.1),
-            locationY: 29.1 + (Math.random() * 0.1),
+            // Location will be set by store logic
             taskCount: 0,
         });
         setFormData({ nameSurname: '', phoneNumber: '' });

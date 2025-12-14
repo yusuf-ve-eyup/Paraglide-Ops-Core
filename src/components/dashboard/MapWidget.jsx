@@ -51,7 +51,7 @@ const MapWidget = () => {
     const flyingPilots = pilots.filter(p => p.status === 'flying');
     const befFlyPilots = pilots.filter(p => p.status === 'befFly');
 
-    const defaultCenter = [36.55, 29.15];
+    const defaultCenter = [37.7393401, 29.0999314];
 
     return (
         <div className="h-full w-full relative z-0">

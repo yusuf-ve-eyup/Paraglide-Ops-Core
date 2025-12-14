@@ -18,8 +18,7 @@ const PilotManagementPage = () => {
         addPilot({
             nameSurname: formData.nameSurname,
             phoneNumber: formData.phoneNumber,
-            locationX: 36.5 + (Math.random() * 0.1), // Mock Location
-            locationY: 29.1 + (Math.random() * 0.1),
+            // Location will be set by store defaults
             status: 'befFly', // Default status
         });
         // Clear form
@@ -50,11 +49,22 @@ const PilotManagementPage = () => {
                                     </p>
                                 </div>
                             </div>
-                            <span className={`px-2 py-1 rounded text-xs uppercase font-bold 
-                                ${pilot.status === 'landed' ? 'bg-red-100 text-red-600' :
-                                    pilot.status === 'flying' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
-                                {pilot.status}
-                            </span>
+                            {(() => {
+                                const statusConfig = {
+                                    befFly: { label: 'Hazırlık', color: 'bg-gray-100 text-gray-600' },
+                                    flying: { label: 'Uçuşta', color: 'bg-blue-100 text-blue-600' },
+                                    landed: { label: 'İniş Yaptı', color: 'bg-red-100 text-red-600' },
+                                    waiting: { label: 'Transfer Bekliyor', color: 'bg-orange-100 text-orange-600' },
+                                    taked: { label: 'Transferde', color: 'bg-green-100 text-green-600' },
+                                };
+                                const config = statusConfig[pilot.status] || { label: pilot.status, color: 'bg-gray-100 text-gray-600' };
+
+                                return (
+                                    <span className={`px-2 py-1 rounded text-xs uppercase font-bold ${config.color}`}>
+                                        {config.label}
+                                    </span>
+                                );
+                            })()}
                         </div>
                     ))}
                     {pilots.length === 0 && <p className="text-center text-gray-400 mt-10">No pilots found.</p>}

@@ -97,8 +97,8 @@ const useRaceStore = create(
           groupId: groupId,
           id: newId,
           status: 'befFly',
-          locationX: 0,
-          locationY: 0,
+          locationX: pilotData.locationX || (37.7394308 + (Math.random() - 0.5) * 0.05),
+          locationY: pilotData.locationY || (29.0999973 + (Math.random() - 0.5) * 0.05),
           // wtsc will be set by server, but for local UI immediate feedback:
           wtsc: Date.now()
         };
@@ -157,6 +157,8 @@ const useRaceStore = create(
           ...retrieverData,
           groupId: groupId,
           id: newId,
+          locationX: retrieverData.locationX || (37.7394308 + (Math.random() - 0.5) * 0.05),
+          locationY: retrieverData.locationY || (29.0999973 + (Math.random() - 0.5) * 0.05),
         };
 
         set((state) => ({ retrievers: [...state.retrievers, newRetriever] }));
