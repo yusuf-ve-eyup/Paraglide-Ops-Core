@@ -143,7 +143,9 @@ const useRaceStore = create(
 
         // Cloud Update
         const { updatePilotStatusInCloud } = await import('../services/raceService');
-        updatePilotStatusInCloud(groupId, id, status);
+        // Pass retrieverId explicitly to helper
+        const targetPilotForCloud = state.pilots.find(p => p.id === id && p.groupId === groupId);
+        updatePilotStatusInCloud(groupId, id, status, targetPilotForCloud?.retrieverId);
       },
 
       addRetriever: async (retrieverData) => {

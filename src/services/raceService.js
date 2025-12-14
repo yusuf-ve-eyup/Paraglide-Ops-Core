@@ -95,7 +95,7 @@ export const addPilotToCloud = async (groupId, pilotData) => {
 };
 
 // Update Pilot
-export const updatePilotStatusInCloud = async (groupId, pilotId, newStatus) => {
+export const updatePilotStatusInCloud = async (groupId, pilotId, newStatus, assignedRetrieverId = null) => {
     try {
         const updates = {};
         updates[`groups/${groupId}/pilots/${pilotId}/status`] = newStatus;
@@ -105,18 +105,22 @@ export const updatePilotStatusInCloud = async (groupId, pilotId, newStatus) => {
 
         // If status is 'taked', we need to decrement the assigned retriever's taskCount
         if (newStatus === 'taked') {
-            // Fetch pilot to get retrieverId
-            const pilotSnapshot = await get(child(ref(db), `groups/${groupId}/pilots/${pilotId}`));
-            if (pilotSnapshot.exists()) {
-                const pilotData = pilotSnapshot.val();
-                const retrieverId = pilotData.retrieverId;
+            let retrieverId = assignedRetrieverId;
 
-                if (retrieverId && retrieverId !== 0 && retrieverId !== "0") {
-                    const retrieverRef = ref(db, `groups/${groupId}/retrievers/${retrieverId}/taskCount`);
-                    await runTransaction(retrieverRef, (currentCount) => {
-                        return Math.max(0, (currentCount || 0) - 1);
-                    });
+            // If not provided explicitly, fetch from DB (fallback)
+            if (!retrieverId) {
+                const pilotSnapshot = await get(child(ref(db), `groups/${groupId}/pilots/${pilotId}`));
+                if (pilotSnapshot.exists()) {
+                    const pilotData = pilotSnapshot.val();
+                    retrieverId = pilotData.retrieverId;
                 }
+            }
+
+            if (retrieverId && retrieverId !== 0 && retrieverId !== "0") {
+                const retrieverRef = ref(db, `groups/${groupId}/retrievers/${retrieverId}/taskCount`);
+                await runTransaction(retrieverRef, (currentCount) => {
+                    return Math.max(0, (currentCount || 0) - 1);
+                });
             }
         }
 
