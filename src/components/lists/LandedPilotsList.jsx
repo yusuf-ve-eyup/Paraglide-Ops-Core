@@ -5,7 +5,10 @@ import { Clock } from 'lucide-react';
 const LandedPilotsList = () => {
     const pilots = useRaceStore((state) => state.pilots);
     const retrievers = useRaceStore((state) => state.retrievers);
-    const updatePilotRetriever = useRaceStore((state) => state.updatePilotRetriever);
+    const assignRetrieverToPilot = useRaceStore((state) => state.assignRetrieverToPilot);
+
+    // Local state to track pending assignments: { [pilotId]: retrieverId }
+    const [pendingAssignments, setPendingAssignments] = React.useState({});
 
     const landedPilots = pilots
         .filter((p) => p.status === 'landed')
@@ -32,11 +35,17 @@ const LandedPilotsList = () => {
     };
 
     const getOptimalRetrieverId = (pilot) => {
+        // If we have a pending change, show that
+        if (pendingAssignments[pilot.id]) {
+            return pendingAssignments[pilot.id];
+        }
+
+        // Otherwise show existing or calculate default
         if (pilot.retrieverId && pilot.retrieverId !== 0 && pilot.retrieverId !== "0") {
             return pilot.retrieverId;
         }
 
-        // Find nearest
+        // Find nearest default
         let nearestId = "";
         let minDist = Infinity;
 
@@ -47,20 +56,23 @@ const LandedPilotsList = () => {
                 nearestId = r.id;
             }
         });
-
-        // Use a timeout/effect to save this "auto-selection" to the DB? 
-        // The user asked for "selected by default". 
-        // If we just show it as selected in the UI without saving to DB, that's "default selection".
-        // Saving it automatically might be aggressive, but ensures consistency. 
-        // For now, let's just RETURN it for the UI value so it LOOKS selected. 
-        // If the user confirms/changes, updates happen. 
-        // Actually, let's strictly follow: "default olarak en yakın mesafedeki araç seçili gelmeli"
         return nearestId;
     };
 
     const handleVehicleChange = (pilotId, e) => {
         const newRetrieverId = e.target.value;
-        updatePilotRetriever(pilotId, newRetrieverId);
+        setPendingAssignments(prev => ({ ...prev, [pilotId]: newRetrieverId }));
+    };
+
+    const handleConfirm = (pilot) => {
+        const selectedId = getOptimalRetrieverId(pilot);
+        assignRetrieverToPilot(pilot.id, selectedId);
+        // Clear pending for this pilot
+        setPendingAssignments(prev => {
+            const newState = { ...prev };
+            delete newState[pilot.id];
+            return newState;
+        });
     };
 
     return (
@@ -72,6 +84,12 @@ const LandedPilotsList = () => {
             <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 {landedPilots.map((pilot) => {
                     const selectedRetrieverId = getOptimalRetrieverId(pilot);
+                    const isPending = !!pendingAssignments[pilot.id];
+                    // Also consider "pending" if it's the first auto-calculation but not saved yet?
+                    // The user wants "Onayla" button. 
+                    // If pilot.retrieverId is missing/0, it means it's not confirmed yet, even if we show a default.
+                    const isConfirmed = pilot.retrieverId && pilot.retrieverId !== 0 && pilot.retrieverId !== "0";
+                    const showConfirmButton = isPending || !isConfirmed;
 
                     return (
                         <div key={pilot.id} className="bg-white p-3 rounded shadow-sm border-l-4 border-red-500 flex flex-col gap-2">
@@ -89,18 +107,28 @@ const LandedPilotsList = () => {
                             {/* Vehicle Assignment */}
                             <div className="mt-1">
                                 <label className="text-xs text-gray-500 font-bold mb-1 block">Pick Up Vehicle:</label>
-                                <select
-                                    className="w-full text-sm border-gray-300 rounded border p-1"
-                                    value={selectedRetrieverId || ""}
-                                    onChange={(e) => handleVehicleChange(pilot.id, e)}
-                                >
-                                    <option value="" disabled>Select Vehicle...</option>
-                                    {retrievers.map(r => (
-                                        <option key={r.id} value={r.id}>
-                                            {r.nameSurname} ({calculateDistance(pilot.locationX, pilot.locationY, r.locationX, r.locationY).toFixed(1)} km)
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="flex gap-1">
+                                    <select
+                                        className="flex-1 text-sm border-gray-300 rounded border p-1"
+                                        value={selectedRetrieverId || ""}
+                                        onChange={(e) => handleVehicleChange(pilot.id, e)}
+                                    >
+                                        <option value="" disabled>Select Vehicle...</option>
+                                        {retrievers.map(r => (
+                                            <option key={r.id} value={r.id}>
+                                                {r.nameSurname} ({calculateDistance(pilot.locationX, pilot.locationY, r.locationX, r.locationY).toFixed(1)} km)
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {showConfirmButton && (
+                                        <button
+                                            onClick={() => handleConfirm(pilot)}
+                                            className="bg-green-600 text-white text-xs px-2 py-1 rounded hover:bg-green-700"
+                                        >
+                                            Onayla
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )

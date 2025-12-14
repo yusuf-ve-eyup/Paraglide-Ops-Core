@@ -77,7 +77,7 @@ const PilotManagementPage = () => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg flex justify-between items-center">
                             <span className="text-blue-800 font-medium">Auto-Assigned ID</span>
-                            <span className="text-2xl font-bold text-blue-700 font-mono tracking-wider">#{nextId}</span>
+                            <span className="text-2xl font-bold text-blue-700 font-mono tracking-wider">{nextId}</span>
                         </div>
 
                         <div>

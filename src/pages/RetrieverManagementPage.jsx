@@ -75,7 +75,7 @@ const RetrieverManagementPage = () => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="bg-green-50 border border-green-200 p-4 rounded-lg flex justify-between items-center">
                             <span className="text-green-800 font-medium">Auto-Assigned ID</span>
-                            <span className="text-2xl font-bold text-green-700 font-mono tracking-wider">#{nextId}</span>
+                            <span className="text-2xl font-bold text-green-700 font-mono tracking-wider">{nextId}</span>
                         </div>
 
                         <div>

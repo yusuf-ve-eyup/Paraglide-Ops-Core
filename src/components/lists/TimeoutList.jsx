@@ -4,9 +4,10 @@ import { AlertTriangle } from 'lucide-react';
 
 const TimeoutList = () => {
     const pilots = useRaceStore((state) => state.pilots);
+    const retrievers = useRaceStore((state) => state.retrievers);
 
     const timeoutThreshold = 30 * 60 * 1000; // 30 minutes
-
+    // Rule: Show pilots who have been in 'waiting' status for more than 30 minutes
     const timeoutPilots = pilots.filter((p) => {
         if (p.status !== 'waiting') return false;
         const timeDiff = Date.now() - new Date(p.wtsc).getTime();
@@ -34,6 +35,19 @@ const TimeoutList = () => {
                         <div>
                             <span className="font-bold text-red-700">{pilot.nameSurname}</span>
                             <p className="text-xs text-gray-500">Waiting for: {getWaitTime(pilot.wtsc)}</p>
+
+                            {/* Assigned Vehicle Info */}
+                            {(() => {
+                                const assignedRetriever = retrievers.find(r => r.id === pilot.retrieverId);
+                                return assignedRetriever ? (
+                                    <div className="mt-1 text-xs bg-orange-50 p-1 rounded border border-orange-200">
+                                        <span className="font-semibold text-orange-800">Assigned: {assignedRetriever.nameSurname}</span>
+                                        <div className="text-orange-600">{assignedRetriever.phoneNumber}</div>
+                                    </div>
+                                ) : (
+                                    <div className="mt-1 text-xs text-red-500 font-semibold">No vehicle assigned</div>
+                                );
+                            })()}
                         </div>
 
                     </div>

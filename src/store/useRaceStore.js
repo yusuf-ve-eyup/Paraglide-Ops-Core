@@ -8,7 +8,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 /**
  * @typedef {Object} Pilot
  * @property {string} groupId
- * @property {string} id - Unique identifier (Auto-inc)
+ * @property {string} id - Unique identifier (Random 6-digit)
  * @property {string} nameSurname
  * @property {string} phoneNumber
  * @property {number} locationX - Latitude
@@ -21,13 +21,25 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 /**
  * @typedef {Object} Retriever
  * @property {string} groupId
- * @property {string} id - Unique identifier (Auto-inc)
+ * @property {string} id - Unique identifier (Random 6-digit)
  * @property {string} nameSurname - Driver name
  * @property {string} phoneNumber
  * @property {number} locationX
  * @property {number} locationY
  * @property {number} taskCount - Active missions count
  */
+
+const generateUniqueId = (existingItems) => {
+  let newId;
+  let isUnique = false;
+  while (!isUnique) {
+    newId = Math.floor(100000 + Math.random() * 900000).toString();
+    if (!existingItems.some(item => item.id === newId)) {
+      isUnique = true;
+    }
+  }
+  return newId;
+};
 
 const useRaceStore = create(
   persist(
@@ -78,14 +90,15 @@ const useRaceStore = create(
 
         // Calculate new ID
         const currentGroupPilots = state.pilots.filter(p => p.groupId === groupId);
-        const maxId = currentGroupPilots.reduce((max, p) => Math.max(max, parseInt(p.id) || 0), 0);
-        const newId = (maxId + 1).toString();
+        const newId = generateUniqueId(currentGroupPilots);
 
         const newPilot = {
           ...pilotData,
           groupId: groupId,
           id: newId,
           status: 'befFly',
+          locationX: 0,
+          locationY: 0,
           // wtsc will be set by server, but for local UI immediate feedback:
           wtsc: Date.now()
         };
@@ -104,11 +117,29 @@ const useRaceStore = create(
         const groupId = state.groupId;
 
         // Optimistic Local Update
-        set((state) => ({
-          pilots: state.pilots.map((p) =>
-            (p.id === id && p.groupId === groupId) ? { ...p, status, wtsc: Date.now() } : p
-          )
-        }));
+        set((state) => {
+          const targetPilot = state.pilots.find(p => p.id === id && p.groupId === groupId);
+          const retrieverId = targetPilot?.retrieverId;
+
+          let newRetrievers = state.retrievers;
+
+          // If status changing to 'taked', decrement task count for assigned retriever
+          if (status === 'taked' && retrieverId && retrieverId !== 0 && retrieverId !== "0") {
+            newRetrievers = state.retrievers.map(r => {
+              if (r.id === retrieverId && r.groupId === groupId) {
+                return { ...r, taskCount: Math.max(0, (r.taskCount || 0) - 1) };
+              }
+              return r;
+            });
+          }
+
+          return {
+            pilots: state.pilots.map((p) =>
+              (p.id === id && p.groupId === groupId) ? { ...p, status, wtsc: Date.now() } : p
+            ),
+            retrievers: newRetrievers
+          };
+        });
 
         // Cloud Update
         const { updatePilotStatusInCloud } = await import('../services/raceService');
@@ -120,8 +151,7 @@ const useRaceStore = create(
         const groupId = state.groupId;
 
         const currentGroupRetrievers = state.retrievers.filter(r => r.groupId === groupId);
-        const maxId = currentGroupRetrievers.reduce((max, r) => Math.max(max, parseInt(r.id) || 0), 0);
-        const newId = (maxId + 1).toString();
+        const newId = generateUniqueId(currentGroupRetrievers);
 
         const newRetriever = {
           ...retrieverData,
@@ -157,21 +187,31 @@ const useRaceStore = create(
         updatePilotRetrieverInCloud(groupId, pilotId, retrieverId);
       },
 
+      assignRetrieverToPilot: async (pilotId, retrieverId) => {
+        const state = get();
+        const groupId = state.groupId;
+
+        // Optimistic Update
+        set((state) => ({
+          pilots: state.pilots.map((p) =>
+            (p.id === pilotId && p.groupId === groupId) ? { ...p, retrieverId, status: 'waiting' } : p
+          ),
+          retrievers: state.retrievers.map((r) => {
+            if (r.id === retrieverId && r.groupId === groupId) {
+              return { ...r, taskCount: (r.taskCount || 0) + 1 };
+            }
+            return r;
+          })
+        }));
+
+        // Cloud Update
+        const { assignRetrieverToPilotInCloud } = await import('../services/raceService');
+        assignRetrieverToPilotInCloud(groupId, pilotId, retrieverId);
+      },
+
       // Helper to get next ID for UI display (optional use)
-      getNextPilotId: () => {
-        const state = get();
-        if (!state.groupId) return "-";
-        const currentGroupPilots = state.pilots.filter(p => p.groupId === state.groupId);
-        const maxId = currentGroupPilots.reduce((max, p) => Math.max(max, parseInt(p.id) || 0), 0);
-        return (maxId + 1).toString();
-      },
-      getNextRetrieverId: () => {
-        const state = get();
-        if (!state.groupId) return "-";
-        const currentGroupRetrievers = state.retrievers.filter(r => r.groupId === state.groupId);
-        const maxId = currentGroupRetrievers.reduce((max, r) => Math.max(max, parseInt(r.id) || 0), 0);
-        return (maxId + 1).toString();
-      },
+      getNextPilotId: () => "AUTO",
+      getNextRetrieverId: () => "AUTO",
     }),
     {
       name: 'race-storage', // name of the item in the storage (must be unique)

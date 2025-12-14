@@ -1,5 +1,5 @@
 // src/services/raceService.js
-import { ref, get, set, child, update, serverTimestamp, onValue } from "firebase/database";
+import { ref, get, set, child, update, serverTimestamp, onValue, runTransaction } from "firebase/database";
 import { db } from "./firebaseConfig";
 
 // --- GROUP MANAGEMENT ---
@@ -102,6 +102,24 @@ export const updatePilotStatusInCloud = async (groupId, pilotId, newStatus) => {
         updates[`groups/${groupId}/pilots/${pilotId}/wtsc`] = serverTimestamp();
 
         await update(ref(db), updates);
+
+        // If status is 'taked', we need to decrement the assigned retriever's taskCount
+        if (newStatus === 'taked') {
+            // Fetch pilot to get retrieverId
+            const pilotSnapshot = await get(child(ref(db), `groups/${groupId}/pilots/${pilotId}`));
+            if (pilotSnapshot.exists()) {
+                const pilotData = pilotSnapshot.val();
+                const retrieverId = pilotData.retrieverId;
+
+                if (retrieverId && retrieverId !== 0 && retrieverId !== "0") {
+                    const retrieverRef = ref(db, `groups/${groupId}/retrievers/${retrieverId}/taskCount`);
+                    await runTransaction(retrieverRef, (currentCount) => {
+                        return Math.max(0, (currentCount || 0) - 1);
+                    });
+                }
+            }
+        }
+
         return { success: true };
     } catch (error) {
         console.error("Update Pilot Error:", error);
@@ -137,6 +155,32 @@ export const updatePilotRetrieverInCloud = async (groupId, pilotId, retrieverId)
         return { success: true };
     } catch (error) {
         console.error("Update Retriever Error:", error);
+        return { success: false, error };
+    }
+};
+
+// Assign Retriever to Pilot (Transaction safe task count increment)
+export const assignRetrieverToPilotInCloud = async (groupId, pilotId, retrieverId) => {
+    try {
+        const updates = {};
+        // 1. Update Pilot
+        updates[`groups/${groupId}/pilots/${pilotId}/retrieverId`] = retrieverId;
+        updates[`groups/${groupId}/pilots/${pilotId}/status`] = 'waiting'; // Change status to waiting
+        updates[`groups/${groupId}/pilots/${pilotId}/wtsc`] = serverTimestamp();
+
+        await update(ref(db), updates);
+
+        // 2. Increment Task Count on Retriever (if not 0)
+        if (retrieverId && retrieverId !== 0 && retrieverId !== "0") {
+            const retrieverRef = ref(db, `groups/${groupId}/retrievers/${retrieverId}/taskCount`);
+            await runTransaction(retrieverRef, (currentCount) => {
+                return (currentCount || 0) + 1;
+            });
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error("Assign Retriever Error:", error);
         return { success: false, error };
     }
 };
