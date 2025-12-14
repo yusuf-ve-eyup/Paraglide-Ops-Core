@@ -20,15 +20,6 @@
             android:exported="true"
             android:foregroundServiceType="location" />
 
-        <receiver
-            android:name="id.flutter.flutter_background_service.BootBroadcastReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-
         <activity
             android:exported="true"
             android:launchMode="singleTop"

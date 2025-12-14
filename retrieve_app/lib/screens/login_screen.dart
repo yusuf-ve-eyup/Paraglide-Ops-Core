@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
+import 'pilot_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,39 +30,64 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Query Firebase Realtime Database
-      // New Structure: 
-      // {
-      //   "groups": {
-      //      "23": {
-      //         "pilots": { ... },
-      //         "retrievers": [ ... ]
-      //      }
-      //   }
-      // }
-      // Path: groups/$groupId/retrievers/$userId
+      final db = FirebaseDatabase.instance;
+      final prefs = await SharedPreferences.getInstance();
 
-      final dbRef = FirebaseDatabase.instance.ref('groups/$groupId/retrievers/$userId');
-      final snapshot = await dbRef.get();
+      // 1. Check Retriever
+      final retrieverRef = db.ref('groups/$groupId/retrievers/$userId');
+      final retrieverSnapshot = await retrieverRef.get();
 
-      if (snapshot.exists) {
-        // Success: Save local session
-        final prefs = await SharedPreferences.getInstance();
+      if (retrieverSnapshot.exists) {
+        // Is Retriever
         await prefs.setBool('isLoggedIn', true);
         await prefs.setString('userId', userId);
         await prefs.setString('groupId', groupId);
+        await prefs.setString('userType', 'retriever');
+        
+        // Save Name if available
+        final data = retrieverSnapshot.value as Map?;
+        if (data != null && data['nameSurname'] != null) {
+             await prefs.setString('nameSurname', data['nameSurname']);
+        }
 
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const HomeScreen()),
           );
         }
-      } else {
+        return;
+      }
+
+      // 2. Check Pilot (if not retriever)
+      final pilotRef = db.ref('groups/$groupId/pilots/$userId');
+      final pilotSnapshot = await pilotRef.get();
+
+      if (pilotSnapshot.exists) {
+        // Is Pilot
+        await prefs.setBool('isLoggedIn', true);
+        await prefs.setString('userId', userId);
+        await prefs.setString('groupId', groupId);
+        await prefs.setString('userType', 'pilot');
+        
+         // Save Name if available
+        final data = pilotSnapshot.value as Map?;
+        if (data != null && data['nameSurname'] != null) {
+             await prefs.setString('nameSurname', data['nameSurname']);
+        }
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invalid Group ID or User ID')),
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const PilotScreen()),
           );
         }
+        return;
+      }
+
+      // 3. Not found
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User ID not found in this Group.')),
+        );
       }
     } catch (e) {
       if (mounted) {
