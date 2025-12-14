@@ -229,12 +229,22 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
                     return const Center(child: Text('No pilots found.'));
                   }
 
-                  final data =
-                      snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+                  final rawData = snapshot.data!.snapshot.value;
+                  final List<MapEntry<dynamic, dynamic>> pilotsList = [];
 
-                  // Convert Map to List
-                  final List<MapEntry<dynamic, dynamic>> pilotsList =
-                      data.entries.toList();
+                  // Handle both Map and List (array) structures from Firebase
+                  if (rawData is Map) {
+                    pilotsList.addAll(rawData.entries);
+                  } else if (rawData is List) {
+                    for (int i = 0; i < rawData.length; i++) {
+                      if (rawData[i] != null) {
+                        // Use the index as the key, effectively converting List to Map entries
+                        pilotsList.add(MapEntry(i.toString(), rawData[i]));
+                      }
+                    }
+                  } else {
+                     return const Center(child: Text('Unexpected data format'));
+                  }
 
                   // Filter
                   final filteredPilots = pilotsList.where((entry) {
