@@ -42,15 +42,16 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
   Future<void> _changeStatus(
     String pilotId,
     String pilotName,
-    bool currentIsFlying,
+    bool isChecked,
   ) async {
     // Unfocus any active element (like the search bar) before showing dialog or changing status
     // to prevent keyboard from popping up unexpectedly.
     FocusManager.instance.primaryFocus?.unfocus();
 
-    // Updated 'befFly' to match the JSON structure provided
-    final newStatus = currentIsFlying ? 'befFly' : 'flying';
-    final action = currentIsFlying ? 'uncheck' : 'check';
+    // If currently checked (active), new status is 'befFly' (inactive).
+    // If currently unchecked (inactive), new status is 'flying' (active).
+    final newStatus = isChecked ? 'befFly' : 'flying';
+    final action = isChecked ? 'uncheck' : 'check';
 
     // Show Confirmation Dialog
     final confirmed = await showDialog<bool>(
@@ -278,7 +279,9 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
 
                       final name = pilotData['nameSurname'] ?? 'Unknown';
                       final status = pilotData['status'];
-                      final isFlying = status == 'flying';
+                      
+                      // LOGIC UPDATE: Checkbox is checked if status is NOT 'befFly'
+                      final isChecked = status != 'befFly';
 
                       return InkWell(
                         onTap: () => _showDetailDialog(pilotData, pilotId),
@@ -302,10 +305,10 @@ class _PilotCheckScreenState extends State<PilotCheckScreen> {
                               Transform.scale(
                                 scale: 1.5,
                                 child: Checkbox(
-                                  value: isFlying,
+                                  value: isChecked,
                                   onChanged: (bool? value) {
                                     if (value != null) {
-                                      _changeStatus(pilotId, name, isFlying);
+                                      _changeStatus(pilotId, name, isChecked);
                                     }
                                   },
                                 ),

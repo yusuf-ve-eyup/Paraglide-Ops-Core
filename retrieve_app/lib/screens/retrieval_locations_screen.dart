@@ -229,6 +229,12 @@ class _RetrievalLocationsScreenState extends State<RetrievalLocationsScreen> {
         'status': 'taked',
         'wtsc': ServerValue.timestamp,
       });
+
+      // NEW: Update Retriever taskCount
+      final retrieverRef = FirebaseDatabase.instance.ref('groups/$_groupId/retrievers/$_userId');
+      await retrieverRef.update({
+        'taskCount': ServerValue.increment(-1),
+      });
     }
   }
 
