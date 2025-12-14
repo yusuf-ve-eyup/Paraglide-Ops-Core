@@ -25,3 +25,10 @@ yarn-error.log*
 
 # 6. Test kapsamı (Varsa)
 coverage/
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# Linter
+.eslintcache

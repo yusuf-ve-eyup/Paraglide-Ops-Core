@@ -22,6 +22,5 @@ const firebaseConfig = {
     appId: "placeholder",
 
 };
-
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
